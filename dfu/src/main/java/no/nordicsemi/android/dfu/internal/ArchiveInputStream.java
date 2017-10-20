@@ -25,7 +25,7 @@ package no.nordicsemi.android.dfu.internal;
 import android.os.Build;
 import android.util.Log;
 
-import com.google.gson.Gson;
+import androidx.annotation.NonNull;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -40,7 +40,7 @@ import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import androidx.annotation.NonNull;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import no.nordicsemi.android.dfu.DfuBaseService;
 import no.nordicsemi.android.dfu.internal.manifest.FileInfo;
 import no.nordicsemi.android.dfu.internal.manifest.Manifest;
@@ -365,7 +365,7 @@ public class ArchiveInputStream extends InputStream {
 		}
 
 		if (manifestData != null) {
-			final ManifestFile manifestFile = new Gson().fromJson(manifestData, ManifestFile.class);
+			final ManifestFile manifestFile = new ObjectMapper().readValue(manifestData, ManifestFile.class);
 			manifest = manifestFile.getManifest();
 			if (manifest == null) {
 				Log.w(TAG, "Manifest failed to be parsed. Did you add \n" +
@@ -394,6 +394,7 @@ public class ArchiveInputStream extends InputStream {
 	public long skip(final long n) {
 		return 0;
 	}
+
 
 	@Override
 	public int read() {
@@ -557,10 +558,9 @@ public class ArchiveInputStream extends InputStream {
 	}
 
 	/**
-	 * Sets the currentSource to the new file or to <code>null</code> if the last file has been
-     * transmitted.
+	 * Sets the currentSource to the new file or to <code>null</code> if the last file has been transmitted.
 	 *
-	 * @return The new source, the same as {@link #currentSource}.
+	 * @return the new source, the same as {@link #currentSource}
 	 */
 	private byte[] startNextFile() {
 		byte[] ret;

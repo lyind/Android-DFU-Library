@@ -22,11 +22,11 @@
 
 package no.nordicsemi.android.dfu;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-
-import androidx.annotation.NonNull;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import android.content.ServiceConnection;
+import android.os.IBinder;
 
 /**
  * A controller class allows you to pause, resume or abort the DFU operation in a easy way.
@@ -38,22 +38,35 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
  * Added in DFU Library version 1.0.2.
  */
 @SuppressWarnings({"WeakerAccess", "unused"})
-public class DfuServiceController implements DfuController {
-	private LocalBroadcastManager mBroadcastManager;
+public class DfuServiceController implements DfuController, ServiceConnection {
 	private boolean mPaused;
 	private boolean mAborted;
 
-	/* package */ DfuServiceController(@NonNull final Context context) {
-		mBroadcastManager = LocalBroadcastManager.getInstance(context);
+	private DfuBaseService dfuBaseService;
+
+
+	@Override
+	public void onServiceConnected(ComponentName className, IBinder service) {
+		DfuBaseService.LocalBinder binder = (DfuBaseService.LocalBinder) service;
+		dfuBaseService = binder.getService();
+	}
+
+	@Override
+	public void onServiceDisconnected(ComponentName arg0) {
+		dfuBaseService = null;
+	}
+
+
+	/* package */ DfuServiceController(final Context context, Intent serviceIntent) {
+
+		context.bindService(serviceIntent, this, 0);
 	}
 
 	@Override
 	public void pause() {
 		if (!mAborted && !mPaused) {
 			mPaused = true;
-			final Intent pauseAction = new Intent(DfuBaseService.BROADCAST_ACTION);
-			pauseAction.putExtra(DfuBaseService.EXTRA_ACTION, DfuBaseService.ACTION_PAUSE);
-			mBroadcastManager.sendBroadcast(pauseAction);
+			dfuBaseService.pause();
 		}
 	}
 
@@ -61,9 +74,7 @@ public class DfuServiceController implements DfuController {
 	public void resume() {
 		if (!mAborted && mPaused) {
 			mPaused = false;
-			final Intent pauseAction = new Intent(DfuBaseService.BROADCAST_ACTION);
-			pauseAction.putExtra(DfuBaseService.EXTRA_ACTION, DfuBaseService.ACTION_RESUME);
-			mBroadcastManager.sendBroadcast(pauseAction);
+			dfuBaseService.resume();
 		}
 	}
 
@@ -72,9 +83,7 @@ public class DfuServiceController implements DfuController {
 		if (!mAborted) {
 			mAborted = true;
 			mPaused = false;
-			final Intent pauseAction = new Intent(DfuBaseService.BROADCAST_ACTION);
-			pauseAction.putExtra(DfuBaseService.EXTRA_ACTION, DfuBaseService.ACTION_ABORT);
-			mBroadcastManager.sendBroadcast(pauseAction);
+			dfuBaseService.abort();
 		}
 	}
 

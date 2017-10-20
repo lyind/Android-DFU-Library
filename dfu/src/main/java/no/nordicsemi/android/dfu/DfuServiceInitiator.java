@@ -22,6 +22,7 @@
 
 package no.nordicsemi.android.dfu;
 
+import android.annotation.TargetApi;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -848,7 +849,7 @@ public final class DfuServiceInitiator {
 		} else {
 			context.startService(intent);
 		}
-		return new DfuServiceController(context);
+		return new DfuServiceController(context, intent);
 	}
 
 	private DfuServiceInitiator init(@Nullable final Uri initFileUri,
@@ -882,10 +883,9 @@ public final class DfuServiceInitiator {
 		return this;
 	}
 
-	@RequiresApi(api = Build.VERSION_CODES.O)
-	public static void createDfuNotificationChannel(@NonNull final Context context) {
-		final NotificationChannel channel =
-				new NotificationChannel(DfuBaseService.NOTIFICATION_CHANNEL_DFU, context.getString(R.string.dfu_channel_name), NotificationManager.IMPORTANCE_LOW);
+	@TargetApi(Build.VERSION_CODES.O)
+	public static void createDfuNotificationChannel(final Context context) {
+		final NotificationChannel channel = new NotificationChannel(DfuBaseService.NOTIFICATION_CHANNEL_DFU, context.getString(R.string.dfu_channel_name), NotificationManager.IMPORTANCE_LOW);
 		channel.setDescription(context.getString(R.string.dfu_channel_description));
 		channel.setShowBadge(false);
 		channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);

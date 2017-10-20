@@ -22,6 +22,7 @@
 
 package no.nordicsemi.android.dfu;
 
+import android.annotation.TargetApi;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
@@ -683,9 +684,8 @@ import no.nordicsemi.android.dfu.internal.scanner.BootloaderScannerFactory;
 	 *
 	 * @param mtu new MTU to be requested.
 	 */
-	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-	void requestMtu(@IntRange(from = 0, to = 517) final int mtu)
-            throws DeviceDisconnectedException, UploadAbortedException {
+	@TargetApi(Build.VERSION_CODES.LOLLIPOP)
+	protected void requestMtu(final int mtu) throws DeviceDisconnectedException, UploadAbortedException {
 		if (mAborted)
 			throw new UploadAbortedException();
 		mRequestCompleted = false;

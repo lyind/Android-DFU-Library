@@ -23,10 +23,7 @@
 package no.nordicsemi.android.dfu;
 
 import android.annotation.SuppressLint;
-import android.app.Activity;
-import android.app.IntentService;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
+import android.app.*;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -42,16 +39,13 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.net.Uri;
-import android.os.Build;
-import android.os.SystemClock;
+import android.os.*;
 import android.preference.PreferenceManager;
 import android.provider.MediaStore;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.app.NotificationCompat;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
-import android.util.Log;
 
 import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
@@ -59,6 +53,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 import no.nordicsemi.android.dfu.internal.ArchiveInputStream;
@@ -68,6 +64,9 @@ import no.nordicsemi.android.dfu.internal.exception.DfuException;
 import no.nordicsemi.android.dfu.internal.exception.SizeValidationException;
 import no.nordicsemi.android.dfu.internal.exception.UploadAbortedException;
 import no.nordicsemi.android.error.GattError;
+
+import static android.app.Notification.*;
+
 
 /**
  * The DFU Service provides full support for Over-the-Air (OTA) Device Firmware Update (DFU)
@@ -94,7 +93,8 @@ import no.nordicsemi.android.error.GattError;
  * application.
  */
 @SuppressWarnings("deprecation")
-public abstract class DfuBaseService extends IntentService implements DfuProgressInfo.ProgressListener {
+public abstract class DfuBaseService extends IntentService implements DfuProgressInfo.ProgressListener, DfuServiceControls
+{
 	private static final String TAG = "DfuBaseService";
 
 	/* package */ static boolean DEBUG = false;
@@ -776,6 +776,50 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	private DfuCallback mDfuServiceImpl;
 	private InputStream mFirmwareInputStream, mInitFileInputStream;
 
+	private final IBinder mBinder = new LocalBinder();
+
+
+	public class LocalBinder extends Binder {
+		DfuBaseService getService() {
+			// allow clients in the same process to directly call our methods
+			return DfuBaseService.this;
+		}
+	}
+
+
+	@Override
+	public IBinder onBind(Intent intent) {
+		return mBinder;
+	}
+
+
+	@Override
+	public void pause()
+	{
+		sendLogBroadcast(LOG_LEVEL_WARNING, "[Broadcast] Pause action received");
+		if (mDfuServiceImpl != null)
+			mDfuServiceImpl.pause();
+	}
+
+
+	@Override
+	public void resume()
+	{
+		sendLogBroadcast(LOG_LEVEL_WARNING, "[Broadcast] Resume action received");
+		if (mDfuServiceImpl != null)
+			mDfuServiceImpl.resume();
+	}
+
+
+	@Override
+	public void abort()
+	{
+		sendLogBroadcast(LOG_LEVEL_WARNING, "[Broadcast] Abort action received");
+		mAborted = true;
+		if (mDfuServiceImpl != null)
+			mDfuServiceImpl.abort();
+	}
+
 	private final BroadcastReceiver mDfuActionReceiver = new BroadcastReceiver() {
 		@Override
 		public void onReceive(final Context context, final Intent intent) {
@@ -784,20 +828,13 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 			logi("User action received: " + action);
 			switch (action) {
 				case ACTION_PAUSE:
-					sendLogBroadcast(LOG_LEVEL_WARNING, "[Broadcast] Pause action received");
-					if (mDfuServiceImpl != null)
-						mDfuServiceImpl.pause();
+					pause();
 					break;
 				case ACTION_RESUME:
-					sendLogBroadcast(LOG_LEVEL_WARNING, "[Broadcast] Resume action received");
-					if (mDfuServiceImpl != null)
-						mDfuServiceImpl.resume();
+					resume();
 					break;
 				case ACTION_ABORT:
-					sendLogBroadcast(LOG_LEVEL_WARNING, "[Broadcast] Abort action received");
-					mAborted = true;
-					if (mDfuServiceImpl != null)
-						mDfuServiceImpl.abort();
+					abort();
 					break;
 			}
 		}
@@ -876,6 +913,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	};
 
 	private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
+		@SuppressLint("MissingPermission")
 		@Override
 		public void onConnectionStateChange(final BluetoothGatt gatt, final int status, final int newState) {
 			// Check whether an error occurred
@@ -1025,12 +1063,10 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 		super.onCreate();
 
 		DEBUG = isDebug();
-		logi("DFU service created. Version: " + BuildConfig.VERSION_NAME);
+		logi("DFU service created");
 		initialize();
 
-		final LocalBroadcastManager manager = LocalBroadcastManager.getInstance(this);
 		final IntentFilter actionFilter = makeDfuActionIntentFilter();
-		manager.registerReceiver(mDfuActionReceiver, actionFilter);
 		registerReceiver(mDfuActionReceiver, actionFilter); // Additionally we must register this receiver as a non-local to get broadcasts from the notification actions
 
 		final IntentFilter filter = new IntentFilter();
@@ -1066,9 +1102,6 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 
 		if (mDfuServiceImpl != null)
 			mDfuServiceImpl.abort();
-
-		final LocalBroadcastManager manager = LocalBroadcastManager.getInstance(this);
-		manager.unregisterReceiver(mDfuActionReceiver);
 
 		unregisterReceiver(mDfuActionReceiver);
 		unregisterReceiver(mConnectionStateBroadcastReceiver);
@@ -1522,6 +1555,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 * @param address the device address.
 	 * @return The GATT device or <code>null</code> if Bluetooth adapter is disabled.
 	 */
+	@SuppressLint("MissingPermission")
 	protected BluetoothGatt connect(@NonNull final String address) {
 		if (!mBluetoothAdapter.isEnabled())
 			return null;
@@ -1657,6 +1691,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 * @param gatt  the GATT device to be refreshed.
 	 * @param force <code>true</code> to force the refresh.
 	 */
+	@SuppressLint("MissingPermission")
 	protected void refreshDeviceCache(@NonNull final BluetoothGatt gatt, final boolean force) {
 		/*
 		 * If the device is bonded this is up to the Service Changed characteristic to notify Android
@@ -1684,6 +1719,118 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 			}
 		}
 	}
+
+	// can't use Notification.Builder just yet
+	private class NotificationBuilder {
+		private final Context context = DfuBaseService.this;
+		private final String channelId = NOTIFICATION_CHANNEL_DFU;
+		private int smallIcon = android.R.drawable.stat_sys_upload;
+		private int color = Color.GRAY;
+		private CharSequence contentTitle = "";
+		private CharSequence contentText = "";
+		private PendingIntent contentIntent = null;
+		private int flags = 0;
+		private int progress;
+		private int max;
+		private boolean indeterminate;
+		private List<Action> actions = new ArrayList<>();
+
+
+		public NotificationBuilder setSmallIcon(int smallIcon) {
+			this.smallIcon = smallIcon;
+			return this;
+		}
+
+		public NotificationBuilder setColor(int color) {
+			this.color = color;
+			return this;
+		}
+
+		public NotificationBuilder setFlag(int flag, boolean isSet)
+		{
+			if (isSet) {
+				flags |= flag;
+			} else {
+				flags &= ~flag;
+			}
+			return this;
+		}
+
+		public NotificationBuilder setOngoing(boolean ongoing) {
+			setFlag(FLAG_ONGOING_EVENT, ongoing);
+			return this;
+		}
+
+		public NotificationBuilder setOnlyAlertOnce(boolean onlyAlertOnce) {
+			return setFlag(FLAG_ONLY_ALERT_ONCE, onlyAlertOnce);
+		}
+
+		public NotificationBuilder setAutoCancel(boolean autoCancel) {
+			return setFlag(FLAG_AUTO_CANCEL, autoCancel);
+		}
+
+		public NotificationBuilder setContentTitle(CharSequence contentTitle) {
+			this.contentTitle = contentTitle;
+			return this;
+		}
+
+		public NotificationBuilder setContentText(CharSequence contentText) {
+			this.contentText = contentText;
+			return this;
+		}
+
+		public NotificationBuilder setContentIntent(PendingIntent intent) {
+			this.contentIntent = intent;
+			return this;
+		}
+
+		public NotificationBuilder setProgress(int progress, int max, boolean indeterminate)
+		{
+			this.progress = progress;
+			this.max = max;
+			this.indeterminate = indeterminate;
+
+			return this;
+		}
+
+		public NotificationBuilder addAction(int icon, CharSequence title, PendingIntent intent) {
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
+			{
+				actions.add(new Action(icon, title, intent));
+			}
+			return this;
+		}
+
+
+		public Notification build() {
+			final Notification notification = new Notification();
+
+			notification.contentIntent = contentIntent;
+			notification.icon = smallIcon;
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+			{
+				notification.color = color;
+			}
+
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
+			{
+				notification.actions = actions.toArray(new Action[actions.size()]);
+
+				final Bundle extras = new Bundle();
+				extras.putCharSequence("android.title", contentTitle);
+				extras.putCharSequence("android.text", contentText);
+				extras.putCharSequence("android.intent.extra.CHANNEL_ID", channelId);
+				extras.putInt("android.progress", progress);
+				extras.putInt("android.progressMax", max);
+				extras.putBoolean("android.progressIndeterminate", indeterminate);
+
+				notification.extras = extras;
+			}
+
+			return notification;
+		}
+	}
+
 
 	/**
 	 * Creates or updates the notification in the Notification Manager. Sends broadcast with
@@ -1715,11 +1862,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 		final String deviceAddress = mDeviceAddress;
 		final String deviceName = mDeviceName != null ? mDeviceName : getString(R.string.dfu_unknown_name);
 
-		final NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_DFU)
-				.setSmallIcon(android.R.drawable.stat_sys_upload).setOnlyAlertOnce(true);//.setLargeIcon(largeIcon);
-		// Android 5
-		builder.setColor(Color.GRAY);
-
+		final NotificationBuilder builder = new NotificationBuilder();
 		switch (progress) {
 			case PROGRESS_CONNECTING:
 				builder.setOngoing(true).setContentTitle(getString(R.string.dfu_status_connecting)).setContentText(getString(R.string.dfu_status_connecting_msg, deviceName))
@@ -1781,7 +1924,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 *
 	 * @param builder notification builder.
 	 */
-	protected void updateProgressNotification(@NonNull final NotificationCompat.Builder builder, final int progress) {
+	protected void updateProgressNotification(@NonNull final NotificationBuilder builder, final int progress) {
 		// Add Abort action to the notification
 		if (progress != PROGRESS_ABORTED && progress != PROGRESS_COMPLETED) {
 			final Intent abortIntent = new Intent(BROADCAST_ACTION);
@@ -1807,7 +1950,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 		final String deviceAddress = mDeviceAddress;
 		final String deviceName = mDeviceName != null ? mDeviceName : getString(R.string.dfu_unknown_name);
 
-		final NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_DFU)
+		final NotificationBuilder builder = new NotificationBuilder()
 				.setSmallIcon(android.R.drawable.stat_sys_upload)
 				.setOnlyAlertOnce(true)
 				.setColor(Color.RED)
@@ -1840,16 +1983,15 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 * @param builder error notification builder
 	 */
 	@SuppressWarnings("unused")
-	protected void updateErrorNotification(@NonNull final NotificationCompat.Builder builder) {
+	protected void updateErrorNotification(@NonNull final NotificationBuilder builder) {
 		// Empty default implementation
 	}
 
 	private void startForeground() {
-		final NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_DFU)
+		final NotificationBuilder builder = new NotificationBuilder()
 				.setSmallIcon(android.R.drawable.stat_sys_upload)
 				.setContentTitle(getString(R.string.dfu_status_foreground_title)).setContentText(getString(R.string.dfu_status_foreground_content))
 				.setColor(Color.GRAY)
-				.setPriority(NotificationCompat.PRIORITY_LOW)
 				.setOngoing(true);
 
 		// Update the notification
@@ -1879,7 +2021,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 * @param builder foreground notification builder
 	 */
 	@SuppressWarnings("unused")
-	protected void updateForegroundNotification(@NonNull final NotificationCompat.Builder builder) {
+	protected void updateForegroundNotification(@NonNull final NotificationBuilder builder) {
 		// Empty default implementation
 	}
 
@@ -1945,7 +2087,8 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 		broadcast.putExtra(EXTRA_PARTS_TOTAL, info.getTotalParts());
 		broadcast.putExtra(EXTRA_SPEED_B_PER_MS, info.getSpeed());
 		broadcast.putExtra(EXTRA_AVG_SPEED_B_PER_MS, info.getAverageSpeed());
-		LocalBroadcastManager.getInstance(this).sendBroadcast(broadcast);
+
+		DfuServiceListenerHelper.forwardProgressIntent(broadcast);
 	}
 
 	private void sendErrorBroadcast(final int error) {
@@ -1964,7 +2107,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 			broadcast.putExtra(EXTRA_ERROR_TYPE, ERROR_TYPE_OTHER);
 		}
 		broadcast.putExtra(EXTRA_DEVICE_ADDRESS, mDeviceAddress);
-		LocalBroadcastManager.getInstance(this).sendBroadcast(broadcast);
+		DfuServiceListenerHelper.forwardProgressIntent(broadcast);
 	}
 
 	/* package */ void sendLogBroadcast(final int level, final String message) {
@@ -1973,7 +2116,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 		broadcast.putExtra(EXTRA_LOG_MESSAGE, fullMessage);
 		broadcast.putExtra(EXTRA_LOG_LEVEL, level);
 		broadcast.putExtra(EXTRA_DEVICE_ADDRESS, mDeviceAddress);
-		LocalBroadcastManager.getInstance(this).sendBroadcast(broadcast);
+		DfuServiceListenerHelper.forwardLogIntent(broadcast);
 	}
 
 	/**

@@ -23,7 +23,6 @@
 package no.nordicsemi.android.dfu;
 
 import android.os.SystemClock;
-import androidx.annotation.NonNull;
 
 /* package */ class DfuProgressInfo {
 	interface ProgressListener {
@@ -42,7 +41,10 @@ import androidx.annotation.NonNull;
 	private int totalParts;
 	private long timeStart, lastProgressTime;
 
-	DfuProgressInfo(final @NonNull ProgressListener listener) {
+	DfuProgressInfo(final ProgressListener listener) {
+		if (listener == null)
+			throw new NullPointerException("listener must not be null");
+
 		mListener = listener;
 	}
 

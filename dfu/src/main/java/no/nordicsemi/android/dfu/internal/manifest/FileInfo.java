@@ -22,11 +22,13 @@
 
 package no.nordicsemi.android.dfu.internal.manifest;
 
-import com.google.gson.annotations.SerializedName;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 
 public class FileInfo {
-	@SerializedName("bin_file") private String binFile;
-	@SerializedName("dat_file") private String datFile;
+	@JsonProperty("bin_file") private String binFile;
+	@JsonProperty("dat_file") private String datFile;
 
 	public String getBinFileName() {
 		return binFile;
