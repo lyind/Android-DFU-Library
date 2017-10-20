@@ -23,6 +23,7 @@
 package no.nordicsemi.android.dfu;
 
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
@@ -30,7 +31,6 @@ import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.content.Intent;
 import android.os.Build;
-import android.support.annotation.RequiresApi;
 import android.util.Log;
 
 import java.io.InputStream;
@@ -593,7 +593,7 @@ import no.nordicsemi.android.dfu.internal.scanner.BootloaderScannerFactory;
 	 * Only DFU from SDK 14.1 or newer supports MTU > 23.
 	 * @param mtu new MTU to be requested
 	 */
-	@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+	@TargetApi(Build.VERSION_CODES.LOLLIPOP)
 	protected void requestMtu(final int mtu) throws DeviceDisconnectedException, UploadAbortedException {
 		if (mAborted)
 			throw new UploadAbortedException();

@@ -22,10 +22,7 @@
 
 package no.nordicsemi.android.dfu.internal;
 
-import android.support.annotation.NonNull;
 import android.util.Log;
-
-import com.google.gson.Gson;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
@@ -38,6 +35,7 @@ import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import no.nordicsemi.android.dfu.DfuBaseService;
 import no.nordicsemi.android.dfu.internal.manifest.FileInfo;
 import no.nordicsemi.android.dfu.internal.manifest.Manifest;
@@ -309,7 +307,7 @@ public class ArchiveInputStream extends ZipInputStream {
 		}
 
 		if (manifestData != null) {
-			final ManifestFile manifestFile = new Gson().fromJson(manifestData, ManifestFile.class);
+			final ManifestFile manifestFile = new ObjectMapper().readValue(manifestData, ManifestFile.class);
 			manifest = manifestFile.getManifest();
 			if (manifest == null) {
 				Log.w(TAG, "Manifest failed to be parsed. Did you add \n" +
@@ -334,7 +332,10 @@ public class ArchiveInputStream extends ZipInputStream {
 	}
 
 	@Override
-	public int read(@NonNull final byte[] buffer) throws IOException {
+	public int read(final byte[] buffer) throws IOException {
+		if (buffer == null)
+			throw new NullPointerException("buffer must not be null");
+
 		int maxSize = currentSource.length - bytesReadFromCurrentSource;
 		int size = buffer.length <= maxSize ? buffer.length : maxSize;
 		System.arraycopy(currentSource, bytesReadFromCurrentSource, buffer, 0, size);
@@ -403,7 +404,7 @@ public class ArchiveInputStream extends ZipInputStream {
 
 	/**
 	 * Returns the content type based on the content of the ZIP file. The content type may be truncated using {@link #setContentType(int)}.
-	 * 
+	 *
 	 * @return a bit field of {@link DfuBaseService#TYPE_SOFT_DEVICE TYPE_SOFT_DEVICE}, {@link DfuBaseService#TYPE_BOOTLOADER TYPE_BOOTLOADER} and {@link DfuBaseService#TYPE_APPLICATION
 	 *         TYPE_APPLICATION}
 	 */
@@ -424,7 +425,7 @@ public class ArchiveInputStream extends ZipInputStream {
 
 	/**
 	 * Truncates the current content type. May be used to hide some files, e.g. to send Soft Device and Bootloader without Application or only the Application.
-	 * 
+	 *
 	 * @param type
 	 *            the new type
 	 * @return the final type after truncating
@@ -468,7 +469,7 @@ public class ArchiveInputStream extends ZipInputStream {
 
 	/**
 	 * Sets the currentSource to the new file or to <code>null</code> if the last file has been transmitted.
-	 * 
+	 *
 	 * @return the new source, the same as {@link #currentSource}
 	 */
 	private byte[] startNextFile() {

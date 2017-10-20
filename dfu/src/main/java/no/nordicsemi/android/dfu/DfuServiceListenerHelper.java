@@ -26,13 +26,19 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.support.v4.content.LocalBroadcastManager;
+import android.os.Handler;
+import android.os.Message;
 
 import java.util.HashMap;
 import java.util.Map;
 
 import no.nordicsemi.android.dfu.internal.scanner.BootloaderScanner;
 import no.nordicsemi.android.error.GattError;
+
+import static android.content.IntentFilter.NO_MATCH_ACTION;
+import static android.content.IntentFilter.NO_MATCH_CATEGORY;
+import static android.content.IntentFilter.NO_MATCH_DATA;
+
 
 /**
  * A helper class that should be used to register listeners for DFU Service broadcast events.
@@ -47,7 +53,41 @@ public class DfuServiceListenerHelper {
 	private static LogBroadcastReceiver mLogBroadcastReceiver;
 	private static ProgressBroadcastsReceiver mProgressBroadcastReceiver;
 
-	private static class LogBroadcastReceiver extends BroadcastReceiver {
+	private static IntentForwardHandler mLogForwardHandler;
+	private static IntentForwardHandler mProgressForwardHandler;
+
+
+	interface IntentForwarder {
+		void forwardIntent(Intent intent);
+	}
+
+
+	public static class IntentForwardHandler extends Handler {
+
+		private final IntentForwarder intentForwarder;
+		private final IntentFilter filter;
+
+		IntentForwardHandler(IntentForwarder intentForwarder, IntentFilter filter) {
+			this.intentForwarder = intentForwarder;
+			this.filter = filter;
+		}
+
+
+		@Override
+		public void handleMessage(Message msg) {
+			if (intentForwarder != null && msg.obj != null) {
+				final Intent intent = (Intent) msg.obj;
+				//String action, String type, String scheme, Uri data, Set<String> categories, String logTag
+				final int match = filter.match(intent.getAction(), intent.getType(), intent.getScheme(), intent.getData(), intent.getCategories(), this.getClass().getName());
+				if (match != NO_MATCH_DATA && match != NO_MATCH_ACTION && match != NO_MATCH_CATEGORY)
+				{
+					intentForwarder.forwardIntent((Intent)msg.obj);
+				}
+			}
+		}
+	}
+
+	private static class LogBroadcastReceiver extends BroadcastReceiver implements IntentForwarder {
 		private DfuLogListener mGlobalLogListener;
 		private Map<String, DfuLogListener> mListeners = new HashMap<>();
 
@@ -85,6 +125,12 @@ public class DfuServiceListenerHelper {
 
 		@Override
 		public void onReceive(final Context context, final Intent intent) {
+			forwardIntent(intent);
+		}
+
+		@Override
+		public void forwardIntent(Intent intent)
+		{
 			final String address = intent.getStringExtra(DfuBaseService.EXTRA_DEVICE_ADDRESS);
 
 			// Find proper listeners
@@ -104,7 +150,7 @@ public class DfuServiceListenerHelper {
 		}
 	}
 
-	private static class ProgressBroadcastsReceiver extends BroadcastReceiver {
+	private static class ProgressBroadcastsReceiver extends BroadcastReceiver implements IntentForwarder {
 		private DfuProgressListener mGlobalProgressListener;
 		private Map<String, DfuProgressListener> mListeners = new HashMap<>();
 
@@ -140,8 +186,15 @@ public class DfuServiceListenerHelper {
 			return mGlobalProgressListener == null && mListeners.isEmpty();
 		}
 
+
 		@Override
 		public void onReceive(final Context context, final Intent intent) {
+			forwardIntent(intent);
+		}
+
+
+		public void forwardIntent(Intent intent)
+		{
 			final String address = intent.getStringExtra(DfuBaseService.EXTRA_DEVICE_ADDRESS);
 
 			// Find proper listeners
@@ -265,6 +318,22 @@ public class DfuServiceListenerHelper {
 		}
 	}
 
+
+	public static void forwardProgressIntent(Intent progress) {
+		if (mProgressForwardHandler != null)
+		{
+			mProgressForwardHandler.obtainMessage(0, progress).sendToTarget();
+		}
+	}
+
+	public static void forwardLogIntent(Intent log) {
+		if (mLogForwardHandler != null)
+		{
+			mLogForwardHandler.obtainMessage(0, log).sendToTarget();
+		}
+	}
+
+
 	/**
 	 * Registers the {@link DfuProgressListener}. Registered listener will receive the progress events from the DFU service.
 	 * @param context the application context
@@ -277,7 +346,7 @@ public class DfuServiceListenerHelper {
 			final IntentFilter filter = new IntentFilter();
 			filter.addAction(DfuBaseService.BROADCAST_PROGRESS);
 			filter.addAction(DfuBaseService.BROADCAST_ERROR);
-			LocalBroadcastManager.getInstance(context).registerReceiver(mProgressBroadcastReceiver, filter);
+			mProgressForwardHandler = new IntentForwardHandler(mProgressBroadcastReceiver, filter);
 		}
 		mProgressBroadcastReceiver.setProgressListener(listener);
 	}
@@ -295,7 +364,7 @@ public class DfuServiceListenerHelper {
 			final IntentFilter filter = new IntentFilter();
 			filter.addAction(DfuBaseService.BROADCAST_PROGRESS);
 			filter.addAction(DfuBaseService.BROADCAST_ERROR);
-			LocalBroadcastManager.getInstance(context).registerReceiver(mProgressBroadcastReceiver, filter);
+			mProgressForwardHandler = new IntentForwardHandler(mProgressBroadcastReceiver, filter);
 		}
 		mProgressBroadcastReceiver.setProgressListener(deviceAddress, listener);
 	}
@@ -310,8 +379,8 @@ public class DfuServiceListenerHelper {
 			final boolean empty = mProgressBroadcastReceiver.removeProgressListener(listener);
 
 			if (empty) {
-				LocalBroadcastManager.getInstance(context).unregisterReceiver(mProgressBroadcastReceiver);
 				mProgressBroadcastReceiver = null;
+				mProgressForwardHandler = null;
 			}
 		}
 	}
@@ -327,7 +396,7 @@ public class DfuServiceListenerHelper {
 
 			final IntentFilter filter = new IntentFilter();
 			filter.addAction(DfuBaseService.BROADCAST_LOG);
-			LocalBroadcastManager.getInstance(context).registerReceiver(mLogBroadcastReceiver, filter);
+			mLogForwardHandler = new IntentForwardHandler(mLogBroadcastReceiver, filter);
 		}
 		mLogBroadcastReceiver.setLogListener(listener);
 	}
@@ -344,7 +413,7 @@ public class DfuServiceListenerHelper {
 
 			final IntentFilter filter = new IntentFilter();
 			filter.addAction(DfuBaseService.BROADCAST_LOG);
-			LocalBroadcastManager.getInstance(context).registerReceiver(mLogBroadcastReceiver, filter);
+			mLogForwardHandler = new IntentForwardHandler(mLogBroadcastReceiver, filter);
 		}
 		mLogBroadcastReceiver.setLogListener(deviceAddress, listener);
 	}
@@ -359,8 +428,8 @@ public class DfuServiceListenerHelper {
 			final boolean empty = mLogBroadcastReceiver.removeLogListener(listener);
 
 			if (empty) {
-				LocalBroadcastManager.getInstance(context).unregisterReceiver(mLogBroadcastReceiver);
 				mLogBroadcastReceiver = null;
+				mLogForwardHandler = null;
 			}
 		}
 	}
