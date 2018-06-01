@@ -1,13 +1,13 @@
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 29
+    compileSdkVersion 30
 
     defaultConfig {
         minSdkVersion 18
-        targetSdkVersion 29
+        targetSdkVersion 30
         versionCode 25
-        versionName VERSION_NAME
+        versionName "v1.11.1"
     }
 
     buildTypes {
@@ -24,5 +24,3 @@ dependencies {
     implementation 'androidx.annotation:annotation:1.1.0'
     implementation 'com.google.code.gson:gson:2.8.6'
 }
-
-apply from: rootProject.file('gradle/gradle-bintray-push.gradle')
