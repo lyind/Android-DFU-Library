@@ -26,9 +26,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 @SuppressWarnings("unused")
 public class Manifest {
+	@JsonProperty("application")
 	private FileInfo application;
+
 	private FileInfo bootloader;
 	private FileInfo softdevice;
+
 	@JsonProperty("softdevice_bootloader")
 	private SoftDeviceBootloaderFileInfo softdeviceBootloader;
 

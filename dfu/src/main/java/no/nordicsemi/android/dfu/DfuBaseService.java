@@ -1732,6 +1732,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 		private int flags = 0;
 		private int progress;
 		private int max;
+		private int priority = 0;
 		private boolean indeterminate;
 		private List<Action> actions = new ArrayList<>();
 
@@ -1792,6 +1793,12 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 
 			return this;
 		}
+
+        public NotificationBuilder setPriority(int priority)
+        {
+            this.priority = priority;
+            return this;
+        }
 
 		public NotificationBuilder addAction(int icon, CharSequence title, PendingIntent intent) {
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
@@ -1924,7 +1931,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 *
 	 * @param builder notification builder.
 	 */
-	protected void updateProgressNotification(@NonNull final NotificationBuilder builder, final int progress) {
+	protected void updateProgressNotification(final NotificationBuilder builder, final int progress) {
 		// Add Abort action to the notification
 		if (progress != PROGRESS_ABORTED && progress != PROGRESS_COMPLETED) {
 			final Intent abortIntent = new Intent(BROADCAST_ACTION);
@@ -1983,7 +1990,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 * @param builder error notification builder
 	 */
 	@SuppressWarnings("unused")
-	protected void updateErrorNotification(@NonNull final NotificationBuilder builder) {
+	protected void updateErrorNotification(final NotificationBuilder builder) {
 		// Empty default implementation
 	}
 
@@ -1992,10 +1999,11 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 				.setSmallIcon(android.R.drawable.stat_sys_upload)
 				.setContentTitle(getString(R.string.dfu_status_foreground_title)).setContentText(getString(R.string.dfu_status_foreground_content))
 				.setColor(Color.GRAY)
+				.setPriority(PRIORITY_LOW)
 				.setOngoing(true);
 
 		// Update the notification
-		final Class<? extends Activity> clazz = getNotificationTarget();
+		final Class<? extends Context> clazz = getNotificationTarget();
 		if (clazz != null) {
 			final Intent targetIntent = new Intent(this, clazz);
 			targetIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -2021,7 +2029,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 * @param builder foreground notification builder
 	 */
 	@SuppressWarnings("unused")
-	protected void updateForegroundNotification(@NonNull final NotificationBuilder builder) {
+	protected void updateForegroundNotification(final NotificationBuilder builder) {
 		// Empty default implementation
 	}
 
@@ -2059,7 +2067,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 * @return The target activity class.
 	 */
 	@Nullable
-	protected abstract Class<? extends Activity> getNotificationTarget();
+	protected abstract Class<? extends Context> getNotificationTarget();
 
 	/**
 	 * Override this method to enable detailed debug LogCat logs with DFU events.
