@@ -1467,6 +1467,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 		private int flags = 0;
 		private int progress;
 		private int max;
+		private int priority = 0;
 		private boolean indeterminate;
 		private List<Action> actions = new ArrayList<>();
 
@@ -1527,6 +1528,12 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 
 			return this;
 		}
+
+        public NotificationBuilder setPriority(int priority)
+        {
+            this.priority = priority;
+            return this;
+        }
 
 		public NotificationBuilder addAction(int icon, CharSequence title, PendingIntent intent) {
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
@@ -1655,7 +1662,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 * This method allows you to update the notification showing the upload progress.
 	 * @param builder notification builder
 	 */
-	protected void updateProgressNotification(final NotificationCompat.Builder builder, final int progress) {
+	protected void updateProgressNotification(final NotificationBuilder builder, final int progress) {
 		// Add Abort action to the notification
 		if (progress != PROGRESS_ABORTED && progress != PROGRESS_COMPLETED) {
 			final Intent abortIntent = new Intent(BROADCAST_ACTION);
@@ -1710,7 +1717,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 * This method allows you to update the notification showing an error.
 	 * @param builder error notification builder
 	 */
-	protected void updateErrorNotification(final NotificationCompat.Builder builder) {
+	protected void updateErrorNotification(final NotificationBuilder builder) {
 		// Empty default implementation
 	}
 
@@ -1719,7 +1726,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 				.setSmallIcon(android.R.drawable.stat_sys_upload)
 				.setContentTitle(getString(R.string.dfu_status_foreground_title)).setContentText(getString(R.string.dfu_status_foreground_content))
 				.setColor(Color.GRAY)
-				.setPriority(NotificationCompat.PRIORITY_LOW)
+				.setPriority(PRIORITY_LOW)
 				.setOngoing(true);
 
 		// Update the notification
@@ -1746,7 +1753,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 * This method allows you to update the notification that will be shown when the service goes to the foreground state.
 	 * @param builder foreground notification builder
 	 */
-	protected void updateForegroundNotification(final NotificationCompat.Builder builder) {
+	protected void updateForegroundNotification(final NotificationBuilder builder) {
 		// Empty default implementation
 	}
 
