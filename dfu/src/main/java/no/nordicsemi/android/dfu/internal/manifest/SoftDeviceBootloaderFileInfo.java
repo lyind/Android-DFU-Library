@@ -26,15 +26,43 @@ package no.nordicsemi.android.dfu.internal.manifest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 
-public class SoftDeviceBootloaderFileInfo extends FileInfo {
-	@JsonProperty("bl_size") private int bootloaderSize;
-	@JsonProperty("sd_size") private int softdeviceSize;
+public class SoftDeviceBootloaderFileInfo extends FileInfo
+{
+    public static class InfoReadOnlyMetaData
+    {
+        @JsonProperty("bl_size")
+        private int bootloaderSize;
 
-	public int getSoftdeviceSize() {
-		return softdeviceSize;
-	}
+        @JsonProperty("sd_size")
+        private int softdeviceSize;
+    }
 
-	public int getBootloaderSize() {
-		return bootloaderSize;
-	}
+
+    @JsonProperty("bl_size")
+    private Integer bootloaderSize;
+
+    @JsonProperty("sd_size")
+    private Integer softdeviceSize;
+
+    @JsonProperty("info_read_only_metadata")
+    private InfoReadOnlyMetaData infoReadOnlyMetaData;
+
+
+    public int getSoftdeviceSize()
+    {
+        return infoReadOnlyMetaData != null
+                ? infoReadOnlyMetaData.softdeviceSize
+                : softdeviceSize != null
+                ? softdeviceSize
+                : 0;
+    }
+
+    public int getBootloaderSize()
+    {
+        return infoReadOnlyMetaData != null
+                ? infoReadOnlyMetaData.bootloaderSize
+                : bootloaderSize != null
+                ? bootloaderSize
+                : 0;
+    }
 }
