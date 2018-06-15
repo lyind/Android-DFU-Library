@@ -66,7 +66,11 @@ public class DfuServiceController implements DfuController, ServiceConnection {
 	public void pause() {
 		if (!mAborted && !mPaused) {
 			mPaused = true;
-			dfuBaseService.pause();
+
+			if (dfuBaseService != null)
+			{
+				dfuBaseService.pause();
+			}
 		}
 	}
 
@@ -74,7 +78,11 @@ public class DfuServiceController implements DfuController, ServiceConnection {
 	public void resume() {
 		if (!mAborted && mPaused) {
 			mPaused = false;
-			dfuBaseService.resume();
+
+			if (dfuBaseService != null)
+			{
+				dfuBaseService.resume();
+			}
 		}
 	}
 
@@ -83,7 +91,11 @@ public class DfuServiceController implements DfuController, ServiceConnection {
 		if (!mAborted) {
 			mAborted = true;
 			mPaused = false;
-			dfuBaseService.abort();
+
+			if (dfuBaseService != null)
+			{
+				dfuBaseService.abort();
+			}
 		}
 	}
 
