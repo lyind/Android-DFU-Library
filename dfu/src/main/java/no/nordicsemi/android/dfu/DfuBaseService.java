@@ -1730,7 +1730,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 				.setOngoing(true);
 
 		// Update the notification
-		final Class<? extends Activity> clazz = getNotificationTarget();
+		final Class<? extends Context> clazz = getNotificationTarget();
 		if (clazz != null) {
 			final Intent targetIntent = new Intent(this, clazz);
 			targetIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -1792,7 +1792,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 *
 	 * @return the target activity class
 	 */
-	protected abstract Class<? extends Activity> getNotificationTarget();
+	protected abstract Class<? extends Context> getNotificationTarget();
 
 	/**
 	 * Override this method to enable detailed debug LogCat logs with DFU events.
