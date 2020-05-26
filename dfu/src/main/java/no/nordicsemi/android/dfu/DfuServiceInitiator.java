@@ -35,14 +35,16 @@ import android.os.Build;
 import android.os.ParcelUuid;
 import android.os.Parcelable;
 
-import java.security.InvalidParameterException;
-import java.util.UUID;
-
 import androidx.annotation.IntRange;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RawRes;
-import androidx.annotation.RequiresApi;
+
+import java.security.InvalidParameterException;
+import java.util.UUID;
+
+import static no.nordicsemi.android.dfu.DfuBaseService.NOTIFICATION_CHANNEL_DFU;
+
 
 /**
  * Starting the DfuService service requires a knowledge of some EXTRA_* constants used to pass
@@ -882,6 +884,7 @@ public final class DfuServiceInitiator {
 		}
 		return this;
 	}
+
 
 	@TargetApi(Build.VERSION_CODES.O)
 	public static void createDfuNotificationChannel(final Context context) {
