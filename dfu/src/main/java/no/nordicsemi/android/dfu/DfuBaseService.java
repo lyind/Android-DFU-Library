@@ -23,6 +23,7 @@
 package no.nordicsemi.android.dfu;
 
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.app.*;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -895,6 +896,23 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 
 		final IntentFilter bondFilter = new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
 		registerReceiver(mBondStateBroadcastReceiver, bondFilter);
+
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+		{
+			createDfuNotificationChannel(this);
+		}
+	}
+
+	@TargetApi(Build.VERSION_CODES.O)
+	public static void createDfuNotificationChannel(final Context context) {
+		final NotificationChannel channel = new NotificationChannel(NOTIFICATION_CHANNEL_DFU, context.getString(R.string.dfu_channel_name), NotificationManager.IMPORTANCE_LOW);
+		channel.setDescription(context.getString(R.string.dfu_channel_description));
+		channel.setShowBadge(false);
+		channel.setName(NOTIFICATION_CHANNEL_DFU);
+		channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+
+		final NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+		notificationManager.createNotificationChannel(channel);
 	}
 
 	@Override
@@ -1455,8 +1473,10 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 		}
 	}
 
+
 	// can't use Notification.Builder just yet
-	private class NotificationBuilder {
+	private class NotificationBuilderCompat
+	{
 		private final Context context = DfuBaseService.this;
 		private final String channelId = NOTIFICATION_CHANNEL_DFU;
 		private int smallIcon = android.R.drawable.stat_sys_upload;
@@ -1472,17 +1492,17 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 		private List<Action> actions = new ArrayList<>();
 
 
-		public NotificationBuilder setSmallIcon(int smallIcon) {
+		public NotificationBuilderCompat setSmallIcon(int smallIcon) {
 			this.smallIcon = smallIcon;
 			return this;
 		}
 
-		public NotificationBuilder setColor(int color) {
+		public NotificationBuilderCompat setColor(int color) {
 			this.color = color;
 			return this;
 		}
 
-		public NotificationBuilder setFlag(int flag, boolean isSet)
+		public NotificationBuilderCompat setFlag(int flag, boolean isSet)
 		{
 			if (isSet) {
 				flags |= flag;
@@ -1492,35 +1512,35 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 			return this;
 		}
 
-		public NotificationBuilder setOngoing(boolean ongoing) {
+		public NotificationBuilderCompat setOngoing(boolean ongoing) {
 			setFlag(FLAG_ONGOING_EVENT, ongoing);
 			return this;
 		}
 
-		public NotificationBuilder setOnlyAlertOnce(boolean onlyAlertOnce) {
+		public NotificationBuilderCompat setOnlyAlertOnce(boolean onlyAlertOnce) {
 			return setFlag(FLAG_ONLY_ALERT_ONCE, onlyAlertOnce);
 		}
 
-		public NotificationBuilder setAutoCancel(boolean autoCancel) {
+		public NotificationBuilderCompat setAutoCancel(boolean autoCancel) {
 			return setFlag(FLAG_AUTO_CANCEL, autoCancel);
 		}
 
-		public NotificationBuilder setContentTitle(CharSequence contentTitle) {
+		public NotificationBuilderCompat setContentTitle(CharSequence contentTitle) {
 			this.contentTitle = contentTitle;
 			return this;
 		}
 
-		public NotificationBuilder setContentText(CharSequence contentText) {
+		public NotificationBuilderCompat setContentText(CharSequence contentText) {
 			this.contentText = contentText;
 			return this;
 		}
 
-		public NotificationBuilder setContentIntent(PendingIntent intent) {
+		public NotificationBuilderCompat setContentIntent(PendingIntent intent) {
 			this.contentIntent = intent;
 			return this;
 		}
 
-		public NotificationBuilder setProgress(int progress, int max, boolean indeterminate)
+		public NotificationBuilderCompat setProgress(int progress, int max, boolean indeterminate)
 		{
 			this.progress = progress;
 			this.max = max;
@@ -1529,13 +1549,13 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 			return this;
 		}
 
-        public NotificationBuilder setPriority(int priority)
+        public NotificationBuilderCompat setPriority(int priority)
         {
             this.priority = priority;
             return this;
         }
 
-		public NotificationBuilder addAction(int icon, CharSequence title, PendingIntent intent) {
+		public NotificationBuilderCompat addAction(int icon, CharSequence title, PendingIntent intent) {
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
 			{
 				actions.add(new Action(icon, title, intent));
@@ -1545,31 +1565,51 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 
 
 		public Notification build() {
-			final Notification notification = new Notification();
 
-			notification.contentIntent = contentIntent;
-			notification.icon = smallIcon;
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
 			{
-				notification.color = color;
+				final Notification.Builder builder = new Notification.Builder(context, channelId);
+				builder.setTicker(contentTitle);
+				builder.setContentIntent(contentIntent);
+				builder.setSmallIcon(smallIcon);
+				builder.setColor(color);
+				builder.setActions(actions.toArray(new Action[actions.size()]));
+				builder.setContentTitle(contentTitle);
+				builder.setContentText(contentText);
+				builder.setChannelId(channelId);
+				builder.setProgress(max, progress, indeterminate);
+
+				return builder.build();
 			}
+			else
+				{
+				final Notification notification = new Notification(smallIcon, contentTitle, System.currentTimeMillis());
 
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
-			{
-				notification.actions = actions.toArray(new Action[actions.size()]);
+				notification.tickerText = contentTitle;
+				notification.contentIntent = contentIntent;
+				notification.icon = smallIcon;
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+				{
+					notification.color = color;
+				}
 
-				final Bundle extras = new Bundle();
-				extras.putCharSequence("android.title", contentTitle);
-				extras.putCharSequence("android.text", contentText);
-				extras.putCharSequence("android.intent.extra.CHANNEL_ID", channelId);
-				extras.putInt("android.progress", progress);
-				extras.putInt("android.progressMax", max);
-				extras.putBoolean("android.progressIndeterminate", indeterminate);
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
+				{
+					notification.actions = actions.toArray(new Action[actions.size()]);
 
-				notification.extras = extras;
+					final Bundle extras = new Bundle();
+					extras.putCharSequence("android.title", contentTitle);
+					extras.putCharSequence("android.text", contentText);
+					extras.putCharSequence("android.intent.extra.CHANNEL_ID", channelId);
+					extras.putInt("android.progress", progress);
+					extras.putInt("android.progressMax", max);
+					extras.putBoolean("android.progressIndeterminate", indeterminate);
+
+					notification.extras = extras;
+				}
+
+				return notification;
 			}
-
-			return notification;
 		}
 	}
 
@@ -1603,7 +1643,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 		final String deviceAddress = mDeviceAddress;
 		final String deviceName = mDeviceName != null ? mDeviceName : getString(R.string.dfu_unknown_name);
 
-		final NotificationBuilder builder = new NotificationBuilder();
+		final NotificationBuilderCompat builder = new NotificationBuilderCompat();
 		switch (progress) {
 			case PROGRESS_CONNECTING:
 				builder.setOngoing(true).setContentTitle(getString(R.string.dfu_status_connecting)).setContentText(getString(R.string.dfu_status_connecting_msg, deviceName))
@@ -1662,7 +1702,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 * This method allows you to update the notification showing the upload progress.
 	 * @param builder notification builder
 	 */
-	protected void updateProgressNotification(final NotificationBuilder builder, final int progress) {
+	protected void updateProgressNotification(final NotificationBuilderCompat builder, final int progress) {
 		// Add Abort action to the notification
 		if (progress != PROGRESS_ABORTED && progress != PROGRESS_COMPLETED) {
 			final Intent abortIntent = new Intent(BROADCAST_ACTION);
@@ -1687,7 +1727,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 		final String deviceAddress = mDeviceAddress;
 		final String deviceName = mDeviceName != null ? mDeviceName : getString(R.string.dfu_unknown_name);
 
-		final NotificationBuilder builder = new NotificationBuilder()
+		final NotificationBuilderCompat builder = new NotificationBuilderCompat()
 				.setSmallIcon(android.R.drawable.stat_sys_upload)
 				.setOnlyAlertOnce(true)
 				.setColor(Color.RED)
@@ -1717,12 +1757,12 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 * This method allows you to update the notification showing an error.
 	 * @param builder error notification builder
 	 */
-	protected void updateErrorNotification(final NotificationBuilder builder) {
+	protected void updateErrorNotification(final NotificationBuilderCompat builder) {
 		// Empty default implementation
 	}
 
 	private void startForeground() {
-		final NotificationBuilder builder = new NotificationBuilder()
+		final NotificationBuilderCompat builder = new NotificationBuilderCompat()
 				.setSmallIcon(android.R.drawable.stat_sys_upload)
 				.setContentTitle(getString(R.string.dfu_status_foreground_title)).setContentText(getString(R.string.dfu_status_foreground_content))
 				.setColor(Color.GRAY)
@@ -1753,7 +1793,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 	 * This method allows you to update the notification that will be shown when the service goes to the foreground state.
 	 * @param builder foreground notification builder
 	 */
-	protected void updateForegroundNotification(final NotificationBuilder builder) {
+	protected void updateForegroundNotification(final NotificationBuilderCompat builder) {
 		// Empty default implementation
 	}
 

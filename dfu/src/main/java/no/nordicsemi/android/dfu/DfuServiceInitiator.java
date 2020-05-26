@@ -38,6 +38,9 @@ import android.os.Parcelable;
 import java.security.InvalidParameterException;
 import java.util.UUID;
 
+import static no.nordicsemi.android.dfu.DfuBaseService.NOTIFICATION_CHANNEL_DFU;
+
+
 /**
  * Starting the DfuService service requires a knowledge of some EXTRA_* constants used to pass parameters to the service.
  * The DfuServiceInitiator class may be used to make this process easier. It provides simple API that covers all low lever operations.
@@ -582,16 +585,5 @@ public class DfuServiceInitiator {
 			this.initFileResId = 0;
 		}
 		return this;
-	}
-
-	@TargetApi(Build.VERSION_CODES.O)
-	public static void createDfuNotificationChannel(final Context context) {
-		final NotificationChannel channel = new NotificationChannel(DfuBaseService.NOTIFICATION_CHANNEL_DFU, context.getString(R.string.dfu_channel_name), NotificationManager.IMPORTANCE_LOW);
-		channel.setDescription(context.getString(R.string.dfu_channel_description));
-		channel.setShowBadge(false);
-		channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-
-		final NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-		notificationManager.createNotificationChannel(channel);
 	}
 }
