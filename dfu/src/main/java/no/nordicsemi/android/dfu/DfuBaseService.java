@@ -881,7 +881,7 @@ public abstract class DfuBaseService extends IntentService implements DfuProgres
 		super.onCreate();
 
 		DEBUG = isDebug();
-		logi("DFU service created. Version: " + BuildConfig.VERSION_NAME);
+		logi("DFU service created.");
 		initialize();
 
 		final IntentFilter actionFilter = makeDfuActionIntentFilter();
